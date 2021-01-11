@@ -83,9 +83,9 @@ class Dashboard extends React.Component<DashboardProps, DashboardState> {
 
                 <div className="w-3/12">
                     <h1 className="text-white font-medium mb-6 text-xl">Weather</h1>
-                        
-                    <WeatherWidget name='origin' editIcao="yes" icao={this.props.departingAirport} />
-                    <WeatherWidget name='dest' editIcao="yes" icao={this.props.arrivingAirport} />
+                    {/* remove ternary operator once we use nullable props */}
+                    <WeatherWidget name='origin' icao={this.props.departingAirport === '----' ? undefined : this.props.departingAirport} />
+                    <WeatherWidget name='dest' icao={this.props.arrivingAirport === '----' ? undefined : this.props.arrivingAirport} />
                 </div>
 
                 <div className="w-5/12 ml-4">

@@ -18,7 +18,7 @@
 
 import React, { useEffect, useState } from 'react';
 import metarParser from 'aewx-metar-parser';
-import { Metar } from '@flybywiresim/api-client';
+import { Metar as MetarClient } from '@flybywiresim/api-client';
 import { IconWind } from '@tabler/icons';
 import { IconGauge } from '@tabler/icons';
 import { IconDroplet } from '@tabler/icons';
@@ -27,7 +27,7 @@ import { IconAccessPoint } from '@tabler/icons';
 import { IconRouter } from '@tabler/icons';
 import { IconPoint } from '@tabler/icons';
 
-declare type MetarParserType = {
+type Metar = {
     raw_text: string,
     raw_parts: [string],
     icao: string,
@@ -91,98 +91,18 @@ type Barometer = {
     mb: number,
 };
 
-const MetarParserTypeWindState: Wind = {
-    degrees:   0,
-    speed_kts: 0,
-    speed_mps: 0,
-    gust_kts:  0,
-    gust_mps:  0
-};
-
-const Visibility = {
-    miles:        "",
-    miles_float:  0.0,
-    meters:       "",
-    meters_float: 0.0,
-};
-
-const ConditionCode = {
-    code: "",
-};
-
-const Cloud = {
-    code:            "",
-    base_feet_agl:   0,
-    base_meters_agl: 0,
-};
-
-const Ceiling = {
-    code:       "",
-    feet_agl:   0,
-    meters_agl: 0,
-};
-
-const Temperature = {
-    celsius:    0,
-    fahrenheit: 0,
-};
-
-const Dewpoint = {
-    celsius:    0,
-    fahrenheit: 0,
-};
-
-const Barometer = {
-    hg:     0,
-    kpa:    0,
-    mb:     0,
-};
-
-const MetarParserTypeState: MetarParserType = {
-    raw_text: "",
-    raw_parts: [""],
-    icao: "",
-    observed: new Date,
-    wind: MetarParserTypeWindState,
-    visibility: Visibility,
-    conditions: [ConditionCode],
-    clouds: [Cloud],
-    ceiling: Ceiling,
-    temperature: Temperature,
-    dewpoint: Dewpoint,
-    humidity_percent: 0,
-    barometer: Barometer,
-    flight_category: "",
-};
-
-const MetarParserTypeProp: MetarParserType = {
-    raw_text: "",
-    raw_parts: [""],
-    icao: "",
-    observed: new Date(0),
-    wind: MetarParserTypeWindState,
-    visibility: Visibility,
-    conditions: [ConditionCode],
-    clouds: [Cloud],
-    ceiling: Ceiling,
-    temperature: Temperature,
-    dewpoint: Dewpoint,
-    humidity_percent: 0,
-    barometer: Barometer,
-    flight_category: "",
-};
-
-type WeatherWidgetProps = { name: string, editIcao: string, icao: string };
+type WeatherWidgetProps = { name: string, icao?: string };
 
 const WeatherWidget = (props: WeatherWidgetProps) => {
-
-    const [metar, setMetar] = useState<MetarParserType>(MetarParserTypeProp);
+    const [enteredIcao, setEnteredIcao] = useState<string>('');
+    const [metar, setMetar] = useState<Metar>();
     const [modalStatus, setModalStatus] = useState(false);
 
     // This could be modified using the Settings tab perhaps?
     const source = "vatsim";
 
     const handleIcao = (event: { target: { value: React.SetStateAction<string>; }; }) => {
+        setEnteredIcao(event.target.value);
         if (event.target.value.length === 4) {
             getMetar(event.target.value, source);
         } else if (event.target.value.length === 0) {
@@ -190,21 +110,18 @@ const WeatherWidget = (props: WeatherWidgetProps) => {
         }
     };
 
-    function getMetar(icao:any, source: any) {
-        if (icao.length !== 4) {
-            return new Promise(() => {
-                setMetar(MetarParserTypeProp);
-            });
-        }
-        return Metar.get(icao, source)
-            .then(result => {
+    async function getMetar(icao:any, source: any) {
+        if (icao) {
+            try {
+                const result = await MetarClient.get(icao, source);
                 const metarParse = metarParser(result.metar);
                 console.info(metarParse);
+                setEnteredIcao(icao);
                 setMetar(metarParse);
-            })
-            .catch(() => {
-                setMetar(MetarParserTypeProp);
-            });
+            } catch (e) {
+                setMetar(undefined);
+            }
+        }
     }
 
     useEffect(() => {
@@ -217,21 +134,16 @@ const WeatherWidget = (props: WeatherWidgetProps) => {
 
     return (
         <div className="bg-gray-800 rounded-xl p-6 text-white mb-4 shadow-lg" id={'weather-card-' + props.name}>
-            {metar === undefined ?
-                <p>Loading ...</p>
-                :
-                <><div className="mb-6">
+            {<><div className="mb-6">
                     <div className="flex items-center">
-                        {props.editIcao == "yes" ?
-                            <>
+                        {<>
                                 <IconAccessPoint className="absolute" size={35} stroke={1.5} strokeLinejoin="miter" />
                                 <input className="ml-12 border-none focus:outline-none text-2xl bg-transparent font-medium uppercase"
                                     type="text"
-                                    placeholder={props.icao}
+                                    placeholder={props.icao ?? '----'}
+                                    value={enteredIcao}
                                     onChange={handleIcao} />
-                            </>
-                            :
-                            metar.icao
+                        </>
                         }
                     </div>
                 </div>
@@ -241,32 +153,30 @@ const WeatherWidget = (props: WeatherWidgetProps) => {
                             <div className="flex justify-center">
                                 <IconGauge className="mb-2" size={35} stroke={1.5} strokeLinejoin="miter" />
                             </div>
-                            {metar.barometer.mb.toFixed(0)} mb
+                            {metar?.barometer.mb.toFixed(0) ?? '???'} mb
                         </div>
                         <div className="text-center text-lg">
                             <div className="flex justify-center">
                                 <IconWind className="mb-2" size={35} stroke={1.5} strokeLinejoin="miter" />
                             </div>
-                            {metar.wind.degrees.toFixed(0)} <IconPoint className="inline-block -mx-1" size={20} stroke={1.5} strokeLinejoin="miter" /> / {metar.wind.speed_kts.toFixed(0)} kts
+                            {metar?.wind.degrees.toFixed(0) ?? '???'}° / {metar?.wind.speed_kts.toFixed(0) ?? '???'} kts
                         </div>
                         <div className="text-center text-lg mt-3">
                             <div className="flex justify-center">
                                 <IconTemperature className="mb-2" size={35} stroke={1.5} strokeLinejoin="miter" />
                             </div>
-                            {metar.temperature.celsius.toFixed(0)} <IconPoint className="inline-block -mx-1" size={20} stroke={1.5} strokeLinejoin="miter" /> C
+                            {metar?.temperature.celsius.toFixed(0) ?? '???'} °C
                         </div>
                         <div className="text-center text-lg mt-3">
                             <div className="flex justify-center">
                                 <IconDroplet className="mb-2" size={35} stroke={1.5} strokeLinejoin="miter" />
                             </div>
-                            {metar.dewpoint.celsius.toFixed(0)} <IconPoint className="inline-block -mx-1" size={20} stroke={1.5} strokeLinejoin="miter" /> C
+                            {metar?.dewpoint.celsius.toFixed(0) ?? '???'} °C
                         </div>
                     </div>
                 </div>
-                <div>
-                    {
-                        <span className="font-medium leading-7"><IconRouter className="mr-2 inline-block" size={23} stroke={1.5} strokeLinejoin="miter" /> {metar.raw_text !== "" ? metar.raw_text : '---------------------------------------------------'}</span>
-                    }
+                <div className="font-medium leading-7">
+                    <IconRouter className="mr-2 inline-block" size={23} stroke={1.5} strokeLinejoin="miter" /> {metar?.raw_text ?? 'No METAR Available'}
                 </div>
                 </>
             }
